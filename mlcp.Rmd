@@ -1,0 +1,83 @@
+---
+title: "Machine learning course project"
+author: "Dmitry Regent"
+output: html_document
+---
+
+###Used libraries
+
+```{r, message=F, warning=F}
+library(caret)
+library(randomForest)
+```
+
+###Loading data
+
+```{r, cache=TRUE}
+training <- read.csv("pml-training.csv",na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv("pml-testing.csv",na.strings=c("NA","#DIV/0!",""))
+```
+
+###Missed data researh
+
+```{r}
+names <- names(training)
+nas <- sapply(1:length(names), function(i) sum(is.na(training[names[i]])))
+range(nas[nas > 0])
+```
+
+As we can see if any predictor has missed data points it is 19216-19622 times. Now let's compare it to entire data set
+
+```{r}
+dim(training)
+length(names[nas>0])
+```
+
+We have only 19622 observations so missed 19216 (or more) looks like totaly missed data by specific predictor. We have 100 predictors which could be removed from data set without serious effect.
+
+```{r}
+names <- names[nas==0]
+training <- training[,which(names(training) %in% names)]
+testing <- testing[,which(names(testing) %in% names)]
+```
+
+We have stong dependecies of "X" because data set is sorted by "classe" and "X" is just a row number. Also we don't need timestamps in predictors.
+
+```{r}
+training <- training[,-c(1,3,4,5)]
+testing <- testing[,-c(1,3,4,5)]
+```
+
+###Predict constraction
+
+Partition data set for validation
+
+```{r}
+set.seed(123)
+l <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+train.data <- training[l,] 
+test.data <- training[-l,]
+```
+
+Training the model
+
+```{r, cache=TRUE}
+model.forest <- randomForest(classe ~. , data=train.data)
+```
+
+Prediction
+
+```{r}
+prediction <- predict(model.forest, test.data)
+confusionMatrix(prediction, test.data$classe)$overall["Accuracy"]
+```
+Pretty good accuracy. Let's find classes for testing data. 
+
+(I can't just call predict(model.forest, training) because of some problem in my R installation or library versions, so I do It in such a strange way)
+
+```{r}
+testing$classe  <- test.data$classe[1]
+test.data <- rbind(test.data, testing)
+tail(predict(model.forest, test.data),20)
+```
+
